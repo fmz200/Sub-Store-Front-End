@@ -1,8 +1,37 @@
 <template>
   <div class="my-page-wrapper">
     <div class="profile-block">
+      <div class="radio-wrapper" >
+        <span v-for="i in [{value: 'gist'}, {value:'manual'}]" :class="{ 'tag': true, 'current': i.value === storageType }" @click="setTag(i.value)">{{$t(`myPage.storage.${i.value}.label`) }}</span>
+        <p class="storage-info">{{ $t(`myPage.storage.${storageType}.info`) }}</p>
+      </div>
+      <!-- <div class="radio-wrapper" >
+        <nut-radiogroup v-model="storageType" direction="horizontal">
+          <nut-radio shape="button" label="gist">{{ $t(`myPage.storage.gist.label`) }}</nut-radio>
+          <nut-radio shape="button" label="manual">{{ $t(`myPage.storage.manual.label`) }}</nut-radio>
+        </nut-radiogroup>
+      </div> -->
+    
       <div class="info">
-        <div class="avatar-wrapper">
+        <div v-if="storageType === 'manual'" class="avatar-wrapper">
+          <nut-avatar
+            :class="{ 'avatar-normal': !githubUser }"
+            size="72"
+            :icon="displayAvatar"
+          />
+          <div class="name">
+            <p class="title">
+              {{ $t(`myPage.storage.manual.label`) }}
+            </p>
+            <p class="des">
+              <span class="des-line1">{{ $t(`myPage.storage.manual.desc`) }}</span>
+              <!-- <span class="des-line2" v-if="desText.length === 2">
+                {{ desText[1] }}
+              </span> -->
+            </p>
+          </div>
+        </div>
+        <div v-else class="avatar-wrapper">
           <nut-avatar
             :class="{ 'avatar-normal': !githubUser }"
             size="72"
@@ -20,7 +49,38 @@
             </p>
           </div>
         </div>
-        <div class="actions">
+        <div v-if="storageType === 'manual'" class="actions">
+          <!-- <input type="file" @change="uploadFile" /> -->
+          <input type="file" ref="fileInput" accept="application/json,text/json,.json" @change="fileChange" style="display: none">
+          <nut-button
+            class="upload-btn"
+            plain
+            type="primary"
+            :disabled="restoreIsLoading"
+            size="small"
+            :loading="restoreIsLoading"
+            @click="upload()"
+          >
+            <font-awesome-icon
+              icon="fa-solid fa-cloud-arrow-up"
+              v-if="!uploadIsLoading"
+            />
+            {{ $t(`myPage.storage.manual.restore`) }}
+          </nut-button>
+          <a :href="host + '/api/storage'" target="_blank">
+            <nut-button
+              class="download-btn"
+              type="primary"
+              size="small"
+            >
+              <font-awesome-icon
+                icon="fa-solid fa-cloud-arrow-down"
+              />
+              {{ $t(`myPage.storage.manual.backup`) }}
+            </nut-button>
+          </a>
+        </div>
+        <div v-else class="actions">
           <nut-button
             class="upload-btn"
             plain
@@ -89,6 +149,7 @@
         </div>
         <div class="config-input-wrapper">
           <nut-input
+            v-if="storageType !== 'manual'"
             class="input"
             v-model="userInput"
             :disabled="!isEditing"
@@ -96,8 +157,13 @@
             type="text"
             input-align="left"
             :left-icon="iconUser"
-          />
+          >
+            <!-- <template #button>
+              <nut-button :disabled="!isEditing" :plain="!isEditing" size="mini" :type="isEditing ? 'primary' : 'info' " @click="toggleSyncPlatform">{{ syncPlatformInput === 'gitlab' ? ( isEditing ?'切换回 Gist' : 'GitLab Snippet (β)') : ( isEditing ?'切换到 GitLab Snippet (β)' : 'Gist') }}</nut-button>
+            </template> -->
+          </nut-input>
           <nut-input
+            v-if="storageType !== 'manual'"
             class="input"
             v-model="tokenInput"
             :disabled="!isEditing"
@@ -105,6 +171,39 @@
             type="text"
             input-align="left"
             :left-icon="iconKey"
+          />
+          <nut-input
+            class="input"
+            v-model="uaInput"
+            :disabled="!isEditing"
+            :placeholder="$t(`myPage.placeholder.defaultUserAgent`)"
+            type="text"
+            input-align="left"
+            :left-icon="iconUA"
+            right-icon="tips"
+            @click-right-icon="uaTips"
+          />
+          <nut-input
+            class="input"
+            v-model="timeoutInput"
+            :disabled="!isEditing"
+            :placeholder="$t(`myPage.placeholder.defaultTimeout`)"
+            type="number"
+            input-align="left"
+            :left-icon="iconTimeout"
+            right-icon="tips"
+            @click-right-icon="timeoutTips"
+          />
+          <nut-input
+            class="input"
+            v-model="cacheThresholdInput"
+            :disabled="!isEditing"
+            :placeholder="$t(`myPage.placeholder.cacheThreshold`)"
+            type="number"
+            input-align="left"
+            :left-icon="iconMax"
+            right-icon="tips"
+            @click-right-icon="cacheThresholdTips"
           />
         </div>
       </div>
@@ -158,6 +257,9 @@ import { useSettingsApi } from "@/api/settings";
 import avatar from "@/assets/icons/avatar.svg?url";
 import iconKey from "@/assets/icons/key-solid.png";
 import iconUser from "@/assets/icons/user-solid.png";
+import iconUA from "@/assets/icons/user-agent.svg";
+import iconMax from "@/assets/icons/max.svg";
+import iconTimeout from "@/assets/icons/timeout.svg";
 import { useAppNotifyStore } from "@/store/appNotify";
 import { useGlobalStore } from "@/store/global";
 import { useSettingsStore } from "@/store/settings";
@@ -168,14 +270,17 @@ import { computed, ref, watchEffect } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useBackend } from "@/hooks/useBackend";
+import { useHostAPI } from '@/hooks/useHostAPI';
+import { Dialog, Toast } from '@nutui/nutui';
 
 const { t } = useI18n();
 
 // const route = useRoute();
 const router = useRouter();
 const { showNotify } = useAppNotifyStore();
+const { currentUrl: host } = useHostAPI();
 const settingsStore = useSettingsStore();
-const { githubUser, gistToken, syncTime, avatarUrl } =
+const { githubUser, gistToken, syncTime, avatarUrl, defaultUserAgent, defaultTimeout, cacheThreshold, syncPlatform } =
   storeToRefs(settingsStore);
 
 const displayAvatar = computed(() => {
@@ -195,24 +300,39 @@ const onClickAbout = () => {
   router.push(`/aboutUs`);
 };
 
+
 // 编辑 更新
+const syncPlatformInput = ref("");
 const userInput = ref("");
 const tokenInput = ref("");
+const uaInput = ref("");
+const timeoutInput = ref("");
+const cacheThresholdInput = ref("");
 const isEditing = ref(false);
 const isEditLoading = ref(false);
 const isInit = ref(false);
+const storageType = ref('gist');
+const fileInput = ref(null);
 
 const toggleEditMode = async () => {
   isEditLoading.value = true;
   if (isEditing.value) {
     await settingsStore.editSettings({
+      syncPlatform: syncPlatformInput.value,
       githubUser: userInput.value,
       gistToken: tokenInput.value,
+      defaultUserAgent: uaInput.value,
+      defaultTimeout: timeoutInput.value,
+      cacheThreshold: cacheThresholdInput.value,
     });
     setDisplayInfo();
   } else {
+    syncPlatformInput.value = syncPlatform.value;
     userInput.value = githubUser.value;
     tokenInput.value = gistToken.value;
+    uaInput.value = defaultUserAgent.value;
+    timeoutInput.value = defaultTimeout.value;
+    cacheThresholdInput.value = cacheThreshold.value;
   }
   isEditLoading.value = false;
   isEditing.value = !isEditing.value;
@@ -223,17 +343,47 @@ const exitEditMode = () => {
   isEditing.value = false;
   isEditLoading.value = false;
 };
+const toggleSyncPlatform = () => {
+  if (syncPlatformInput.value === 'gitlab') {
+    syncPlatformInput.value = ''
+    Toast.text(`已切换到 ${syncPlatformInput.value === 'gitlab' ? 'GitLab Snippet' : 'Gist'}`);
+  } else {
+      Dialog({
+        title: '切换同步平台',
+        content: 'GitLab Snippet 正在测试中, 相关文案仍然是 Gist, 请备份数据后使用',
+        popClass: 'auto-dialog',
+        okText: `使用 ${syncPlatformInput.value === 'gitlab' ? 'Gist' : ' Snippet'}`,
+        cancelText: '取消',
+        onOk: () => {
+          if (syncPlatformInput.value === 'gitlab') {
+            syncPlatformInput.value = ''
+          } else {
+            syncPlatformInput.value = 'gitlab'
+          }
+          Toast.text(`已切换到 ${syncPlatformInput.value === 'gitlab' ? 'GitLab Snippet' : 'Gist'}`);
+        },
+        closeOnPopstate: true,
+        lockScroll: false,
+      });
+  }
 
+  
+};
 const setDisplayInfo = () => {
+  syncPlatformInput.value = syncPlatform.value || '';
   userInput.value = githubUser.value || t(`myPage.placeholder.noGithubUser`);
   tokenInput.value = gistToken.value
     ? gistToken.value.slice(0, 6) + "************"
     : t(`myPage.placeholder.noGistToken`);
+  uaInput.value = defaultUserAgent.value || t(`myPage.placeholder.noDefaultUserAgent`);
+  timeoutInput.value = defaultTimeout.value || t(`myPage.placeholder.noDefaultTimeout`);
+  cacheThresholdInput.value = cacheThreshold.value || t(`myPage.placeholder.noCacheThreshold`);
 };
 
 // 同步 上传
 const downloadIsLoading = ref(false);
 const uploadIsLoading = ref(false);
+const restoreIsLoading = ref(false);
 const syncIsDisabled = computed(() => {
   return (
     uploadIsLoading.value ||
@@ -251,6 +401,49 @@ const desText = computed(() => {
     return [t(`myPage.placeholder.uploadTime`), butifyDate(syncTime.value)];
   }
 });
+const fileChange = async (event) => {
+  const file = event.target.files[0];
+  if(!file) return
+  try {
+    restoreIsLoading.value = true;
+    const reader = new FileReader();
+    reader.readAsText(file);
+    reader.onload = async () => {
+      
+      const res = await useSettingsApi().restoreSettings({ content: String(reader.result) });
+      if (res?.data?.status === "success") {
+        await initStores(false, true, true);
+        showNotify({
+          type: "success",
+          title: t(`myPage.notify.restore.succeed`),
+        });
+        window.location.reload()
+      } else {
+        throw new Error('restore failed')
+      }
+    }
+
+    reader.onerror = e => {
+      throw e
+    }
+    
+  } catch (e) {
+    showNotify({
+      type: "danger",
+      title: t(`myPage.notify.restore.failed`),
+    });
+    console.error(e);
+  } finally {
+    restoreIsLoading.value = false;
+  }
+};
+const upload = async() => {
+  try {
+    fileInput.value.click()
+  } catch (e) {
+    console.error(e);
+  }
+}
 
 const sync = async (query: "download" | "upload") => {
   switch (query) {
@@ -277,20 +470,58 @@ const sync = async (query: "download" | "upload") => {
       type: "success",
       title: t(`myPage.notify.${query}.succeed`),
     });
+    if (query === "download") {
+      window.location.reload()
+    }
   }
 
   downloadIsLoading.value = false;
   uploadIsLoading.value = false;
 };
-
+const uaTips = () => {
+  Dialog({
+      title: '默认为 clash.meta',
+      content: '可尝试设置为 clash-verge/v1.5.1 等客户端的 User-Agent 让机场后端下发更多协议',
+      popClass: 'auto-dialog',
+      okText: 'OK',
+      noCancelBtn: true,
+      closeOnPopstate: true,
+      lockScroll: false,
+    });
+};
+const timeoutTips = () => {
+  Dialog({
+      title: '可尝试设置为 3000~4000',
+      content: '防止拉取结果的总时长超过代理 app 加载外部资源的最大等待时长, 确保拉取成功',
+      popClass: 'auto-dialog',
+      okText: 'OK',
+      noCancelBtn: true,
+      closeOnPopstate: true,
+      lockScroll: false,
+    });
+};
+const cacheThresholdTips = () => {
+  Dialog({
+      title: '可尝试设置为 1024',
+      content: '下载资源过大时\n若要写入缓存\n代理 app 可能会崩溃重启\n可尝试设置此值',
+      popClass: 'auto-dialog',
+      okText: 'OK',
+      noCancelBtn: true,
+      closeOnPopstate: true,
+      lockScroll: false,
+    });
+};
 // store 刷新数据完成后 复制内容给 input 绑定
-const { isLoading: storeIsLoading } = storeToRefs(useGlobalStore());
+const { isLoading: storeIsLoading, env: backendEnv } = storeToRefs(useGlobalStore());
 watchEffect(() => {
   if (!storeIsLoading.value && !isInit.value) {
     setDisplayInfo();
     isInit.value = true;
   }
 });
+const setTag = (current) => {
+  storageType.value = current
+};
 </script>
 
 <style lang="scss" scoped>
@@ -305,6 +536,32 @@ watchEffect(() => {
   .profile-block {
     width: 100%;
 
+    .radio-wrapper {
+      display: flex;
+      align-items: center;
+      
+
+      .tag {
+        font-size: 12px;
+        color: var(--second-text-color);
+        margin: 0px 5px;
+        padding: 7.5px 2.5px 4px;
+        cursor: pointer;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+      .current {
+        border-bottom: 1px solid var(--primary-color);
+        color: var(--primary-color);
+      }
+      .storage-info {
+        margin-left: auto;
+        font-size: 12px;
+        color: var(--lowest-text-color);
+      }
+
+    }
+
     .config-card {
       margin-top: 20px;
       width: 100%;
@@ -317,11 +574,12 @@ watchEffect(() => {
         display: flex;
         justify-content: space-between;
         align-items: center;
+        padding: 0 0 0 10px;
       }
 
       h1 {
         font-size: 14px;
-        padding: 8px 0;
+        padding: 8px 0 2px 0;
         margin-bottom: 8px;
       }
 
@@ -334,7 +592,7 @@ watchEffect(() => {
 
         .input {
           background: transparent;
-          padding: 16px;
+          padding: 12px;
           color: var(--second-text-color);
 
           :deep(img) {
@@ -343,6 +601,9 @@ watchEffect(() => {
             margin-right: 6px;
             opacity: 0.2;
             filter: brightness(var(--img-brightness));
+          }
+          :deep(.nut-icon-tips:before) {
+            cursor: pointer;
           }
 
           &:not(:first-child) {
@@ -370,7 +631,7 @@ watchEffect(() => {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 24px 0;
+      padding: 12px 0 0 0;
 
       .avatar-wrapper {
         display: flex;

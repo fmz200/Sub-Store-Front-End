@@ -100,18 +100,21 @@
     </nut-cell-group>
 
     <p class="desc-text">
-      {{ $t(`apiSettingPage.apiSettingDesc`) }}
+      <p>{{ $t(`apiSettingPage.apiSettingDesc0`) }}</p>
+      <p>{{ $t(`apiSettingPage.apiSettingDesc1`) }}</p>
+      {{ $t(`apiSettingPage.apiSettingDesc2`) }}
       <a
-        href="https://xream.notion.site/Node-js-render-fork-3334b3943c4f4671b25a24908613e63d"
+        href="https://xream.notion.site/Sub-Store-abe6a96944724dc6a36833d5c9ab7c87"
         target="_blank"
       >
-        https://xream.notion.site/Node-js-render-fork-3334b3943c4f4671b25a24908613e63d</a>
+        https://xream.notion.site/Sub-Store-abe6a96944724dc6a36833d5c9ab7c87</a>
     </p>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { Dialog, Toast } from "@nutui/nutui";
+import { ref, onMounted } from 'vue';
 
 import { useBackend } from '@/hooks/useBackend';
 import { useHostAPI } from '@/hooks/useHostAPI';
@@ -137,6 +140,31 @@ const addApiHandler = async () => {
       });
   checkingAPI.value = false;
 };
+
+onMounted(() => {
+  if (apis.value.length) return;
+  try {
+    if (localStorage.getItem('api-desc-read')) return;
+  } catch (e) {
+    
+  }
+  Dialog({
+    title: '后端设置',
+    content: `请仔细阅读页面底部的说明\n\n该写的都写了`,
+    onCancel: () => {
+      localStorage.setItem('api-desc-read', '1') 
+    },
+    onOk: () => {
+      localStorage.setItem('api-desc-read', '1') 
+    },
+    popClass: "auto-dialog",
+    okText: '我马上看',
+    cancelText: '我立刻看',
+    closeOnClickOverlay: false,
+    lockScroll: false,
+  });
+});
+
 </script>
 
 <style lang="scss" scoped>

@@ -17,13 +17,13 @@ export function useSubsApi() {
     },
     getOne: (type: string, name: string): AxiosPromise<MyAxiosRes> => {
       return request({
-        url: `/api/${type}/${name}`,
+        url: `/api/${type}/${encodeURIComponent(name)}`,
         method: 'get',
       });
     },
     getFlow: (name: string): AxiosPromise<MyAxiosRes> => {
       return request({
-        url: `/api/sub/flow/${name}`,
+        url: `/api/sub/flow/${encodeURIComponent(name)}`,
         method: 'get',
       });
     },
@@ -50,20 +50,20 @@ export function useSubsApi() {
       data: Sub | Collection
     ): AxiosPromise<MyAxiosRes> => {
       return request({
-        url: `/api/${type}/${name}`,
+        url: `/api/${type}/${encodeURIComponent(name)}`,
         method: 'patch',
         data,
       });
     },
     deleteSub: (type: string, name: string): AxiosPromise<MyAxiosRes> => {
       return request({
-        url: `/api/${type}/${name}`,
+        url: `/api/${type}/${encodeURIComponent(name)}`,
         method: 'delete',
       });
     },
     compareSub: (
       type: string,
-      data: Sub | Collection
+      data: Sub | Collection | any
     ): AxiosPromise<MyAxiosRes> => {
       return request({
         url: `/api/preview/${type}`,
