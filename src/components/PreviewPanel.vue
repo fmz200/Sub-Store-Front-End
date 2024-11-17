@@ -45,6 +45,7 @@
   import { Toast, Dialog } from '@nutui/nutui';
   import surfboard from '@/assets/icons/surfboard.png';
   import surge from '@/assets/icons/surge.png';
+  import surgeMac from '@/assets/icons/surgeformac_text.png';
   import clash from '@/assets/icons/clash.png';
   import quanx from '@/assets/icons/quanx.png';
   import loon from '@/assets/icons/loon.png';
@@ -105,7 +106,7 @@
       icon: clashmeta,
     },
     {
-      name: 'Clash',
+      name: 'Clash(Deprecated)',
       path: 'Clash',
       icon: clash,
     },
@@ -118,6 +119,11 @@
       name: 'Surge',
       path: 'Surge',
       icon: surge,
+    },
+    {
+      name: 'Surge(macOS)',
+      path: 'SurgeMac',
+      icon: surgeMac,
     },
 
     {

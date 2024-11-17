@@ -15,17 +15,25 @@
         <template #left>
           <div :class="isNeedBack ? 'icon-back' : 'icon-null'"></div>
           <font-awesome-icon
-            v-if="!isNeedBack && !showFloatingRefreshButton"
+            v-if="!isNeedBack && !appearanceSetting.showFloatingRefreshButton"
             @click.stop="refresh"
             class="fa-arrow-rotate-right"
             icon="fa-solid fa-arrow-rotate-right"
           />
-          <!-- <font-awesome-icon v-if="['/subs', '/sync'].includes(route.path) && !isNeedBack && showFloatingRefreshButton" @click.stop="setSimpleMode(true)" class="fa-plus" icon="fa-solid fa-plus" /> -->
+          <font-awesome-icon
+            v-if="
+              ['/subs', '/sync', '/files'].includes(route.path) &&
+              !appearanceSetting.showFloatingAddButton
+            "
+            @click.stop="add(route)"
+            class="fa-plus"
+            icon="fa-solid fa-plus"
+          />
         </template>
 
         <template #right>
           <font-awesome-icon
-            v-if="isSimpleMode"
+            v-if="appearanceSetting.isSimpleMode"
             @click.stop="setSimpleMode(false)"
             class="navBar-right-icon fa-toggle"
             icon="fa-solid fa-toggle-on "
@@ -85,17 +93,23 @@ import { computed, ref, watchEffect, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useGlobalStore } from "@/store/global";
+import { useSettingsStore } from '@/store/settings';
 import { storeToRefs } from "pinia";
 import { Toast } from "@nutui/nutui";
 import { initStores } from "@/utils/initApp";
+import { useMethodStore } from '@/store/methodStore';
 
 const { t, locale } = useI18n();
 const router = useRouter();
 const route = useRoute();
+const methodStore = useMethodStore()
 const globalStore = useGlobalStore();
 const showLangSwitchPopup = ref(false);
 const langList = ["zh", "en"];
-const { isSimpleMode, showFloatingRefreshButton } = storeToRefs(globalStore);
+const settingsStore = useSettingsStore();
+const { changeAppearanceSetting } = settingsStore;
+const { appearanceSetting } = storeToRefs(settingsStore);
+// const { isSimpleMode, showFloatingRefreshButton } = storeToRefs(globalStore);
 const isLandscape = ref(false);
 const isSmall = ref(false);
 const screenWidth = ref(window.innerWidth);
@@ -169,6 +183,16 @@ const changeLang = (type: string) => {
   showLangSwitchPopup.value = false;
 };
 
+const add = (route: any) => {
+  const routePath = route.path;
+  const addMethodMap = {
+    "/subs": "addSub",
+    "/files": "addFile",
+    "/sync": "addSync",
+  };
+  methodStore.invokeMethod(addMethodMap[routePath], {});
+};
+
 const back = () => {
   if (isNeedBack.value) {
     try {
@@ -183,7 +207,12 @@ const back = () => {
   }
 };
 const setSimpleMode = (isSimpleMode: boolean) => {
-  globalStore.setSimpleMode(isSimpleMode);
+  // globalStore.setSimpleMode(isSimpleMode);
+  const data = {
+    ...appearanceSetting.value,
+    isSimpleMode: isSimpleMode
+  }
+  changeAppearanceSetting({ appearanceSetting: data })
 };
 
 const refresh = () => {
@@ -257,6 +286,7 @@ watchEffect(() => {
       }
 
       .fa-plus {
+        padding-top: v-bind(navBartop);
         color: var(--icon-nav-bar-right);
         position: absolute;
         left: 45px;

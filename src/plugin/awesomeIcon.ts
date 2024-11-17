@@ -30,6 +30,9 @@ import {
   faICursor,
   faFileImport,
   faFileExport,
+  faShareNodes,
+  faLink,
+  faSquareArrowUpRight,
 } from '@fortawesome/free-solid-svg-icons';
 
 library.add(faFileImport);
@@ -61,3 +64,6 @@ library.add(faPaste);
 library.add(faEraser);
 library.add(faT);
 library.add(faICursor);
+library.add(faShareNodes);
+library.add(faLink);
+library.add(faSquareArrowUpRight);
